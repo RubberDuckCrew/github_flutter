@@ -44,8 +44,8 @@ class OAuth2PKCE {
   /// Generates an Authorization URL
   ///
   /// This should be displayed to the user.
-  String createAuthorizeUrl() {
-    return '$baseUrl/authorize${buildQueryString({'client_id': clientId, 'scope': scopes.join(','), 'redirect_uri': redirectUri, 'state': state})}';
+  String createAuthorizeUrl(String codeChallenge) {
+    return '$baseUrl/authorize${buildQueryString({'client_id': clientId, 'scope': scopes.join(','), 'redirect_uri': redirectUri, 'state': state, 'code_challenge': codeChallenge, 'code_challenge_method': 'S256'})}';
   }
 
   Future<ExchangeResponse> exchange(
