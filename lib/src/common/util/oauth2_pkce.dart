@@ -87,12 +87,3 @@ class OAuth2PKCE {
         });
   }
 }
-
-/// Represents a response for exchanging a code for a token.
-class ExchangeResponse {
-  final String? token;
-  final List<String> scopes;
-  final String? tokenType;
-
-  ExchangeResponse(this.token, this.tokenType, this.scopes);
-}
