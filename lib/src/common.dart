@@ -9,6 +9,7 @@ export 'package:github_flutter/src/common/util/device_flow.dart';
 export 'package:github_flutter/src/common/util/errors.dart';
 export 'package:github_flutter/src/common/util/json.dart';
 export 'package:github_flutter/src/common/util/oauth2.dart';
+export 'package:github_flutter/src/common/util/oauth2_pkce.dart';
 export 'package:github_flutter/src/common/util/pagination.dart';
 export 'package:github_flutter/src/common/util/service.dart';
 export 'package:github_flutter/src/common/util/utils.dart';
