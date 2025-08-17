@@ -1,6 +1,9 @@
 import 'dart:convert';
 
-import 'package:github_flutter/src/models/issues.dart';
+import 'package:github_flutter/src/common.dart';
+import 'package:github_flutter/src/common/graphql_service.dart';
+import 'package:graphql/client.dart';
+import 'package:http/http.dart' as http;
 import 'package:test/test.dart';
 
 const String testIssueCommentJson = '''
@@ -50,6 +53,76 @@ const String testIssueCommentJson = '''
   }
 ''';
 
+typedef GetJSONCallback =
+    Future<T> Function<S, T>(
+      String path, {
+      int? statusCode,
+      void Function(http.Response)? fail,
+      Map<String, String>? headers,
+      Map<String, String>? params,
+      JSONConverter<S, T>? convert,
+      String? preview,
+    });
+
+// A mock implementation of GitHub that uses noSuchMethod to avoid implementing
+// all methods of the GitHub class.
+class MockGitHub implements GitHub {
+  @override
+  late final GraphQLService graphql;
+
+  late GetJSONCallback onGetJSON;
+
+  MockGitHub(this.graphql);
+
+  @override
+  Future<T> getJSON<S, T>(
+    String path, {
+    int? statusCode,
+    void Function(http.Response)? fail,
+    Map<String, String>? headers,
+    Map<String, String>? params,
+    JSONConverter<S, T>? convert,
+    String? preview,
+  }) {
+    return onGetJSON<S, T>(
+      path,
+      statusCode: statusCode,
+      fail: fail,
+      headers: headers,
+      params: params,
+      convert: convert,
+      preview: preview,
+    );
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) {
+    // This is needed to avoid implementing all methods of the GitHub class.
+    // We only care about getJSON and graphql.
+  }
+}
+
+// A manual mock for GraphQLService to avoid mockito issues.
+class MockGraphQLService implements GraphQLService {
+  // Callback to be set by the test.
+  late Future<QueryResult> Function(String, Map<String, dynamic>?) onMutate;
+
+  @override
+  Future<QueryResult> mutate(
+    String mutation, {
+    Map<String, dynamic>? variables,
+  }) {
+    return onMutate(mutation, variables);
+  }
+
+  // Unimplemented members
+  @override
+  GitHub get github => throw UnimplementedError();
+  @override
+  Future<QueryResult> query(String query, {Map<String, dynamic>? variables}) =>
+      throw UnimplementedError();
+}
+
 void main() {
   group('Issue Comments', () {
     test('IssueComment from Json', () {
@@ -59,6 +132,154 @@ void main() {
       expect(1352355796, issueComment.id);
       expect('MEMBER', issueComment.authorAssociation);
       expect('CaseyHillers', issueComment.user!.login);
+    });
+  });
+
+  group('IssuesService', () {
+    late IssuesService issuesService;
+    late MockGitHub mockGitHub;
+    late MockGraphQLService mockGraphQLService;
+
+    setUp(() {
+      mockGraphQLService = MockGraphQLService();
+      mockGitHub = MockGitHub(mockGraphQLService);
+      issuesService = IssuesService(mockGitHub);
+    });
+
+    test('deleteIssue success', () async {
+      // Arrange
+      String? capturedMutation;
+      Map<String, dynamic>? capturedVariables;
+      final slug = RepositorySlug('owner', 'repo');
+      const issueNumber = 1;
+      const issueNodeId = 'issue-node-id-456';
+
+      mockGitHub.onGetJSON = <S, T>(
+        String path, {
+        int? statusCode,
+        void Function(http.Response)? fail,
+        Map<String, String>? headers,
+        Map<String, String>? params,
+        JSONConverter<S, T>? convert,
+        String? preview,
+      }) async {
+        if (path == '/repos/owner/repo/issues/1') {
+          final issueJson = {
+            'id': 1,
+            'node_id': issueNodeId,
+            'number': issueNumber,
+            'state': 'open',
+            'title': 'Test Issue',
+            'url': 'https://api.github.com/repos/owner/repo/issues/1',
+            'html_url': 'https://github.com/owner/repo/issues/1',
+            'body': 'Test Body',
+          };
+          final issue = convert!(issueJson as S);
+          return issue;
+        }
+        throw Exception('Unexpected path: $path');
+      };
+
+      mockGraphQLService.onMutate = (mutation, variables) {
+        capturedMutation = mutation;
+        capturedVariables = variables;
+        return Future.value(
+          QueryResult(
+            options: QueryOptions(
+              document: gql(''),
+            ), // ignore: deprecated_member_use
+            source: QueryResultSource.network,
+            data: const {
+              'deleteIssue': {'clientMutationId': '1234'},
+            },
+          ),
+        );
+      };
+
+      // Act
+      await issuesService.deleteIssue(slug, issueNumber);
+
+      // Assert
+      expect(capturedMutation, contains('mutation DeleteIssue'));
+      expect(capturedVariables, {'issueId': issueNodeId});
+    });
+
+    test('deleteIssue failure on get', () async {
+      // Arrange
+      final slug = RepositorySlug('owner', 'repo');
+      const issueNumber = 1;
+
+      mockGitHub.onGetJSON = <S, T>(
+        String path, {
+        int? statusCode,
+        void Function(http.Response)? fail,
+        Map<String, String>? headers,
+        Map<String, String>? params,
+        JSONConverter<S, T>? convert,
+        String? preview,
+      }) async {
+        throw Exception('Failed to get issue');
+      };
+
+      // Act & Assert
+      expect(
+        () => issuesService.deleteIssue(slug, issueNumber),
+        throwsA(isA<Exception>()),
+      );
+    });
+
+    test('deleteIssue failure on mutate', () async {
+      // Arrange
+      final slug = RepositorySlug('owner', 'repo');
+      const issueNumber = 1;
+      const issueNodeId = 'issue-node-id-456';
+
+      mockGitHub.onGetJSON = <S, T>(
+        String path, {
+        int? statusCode,
+        void Function(http.Response)? fail,
+        Map<String, String>? headers,
+        Map<String, String>? params,
+        JSONConverter<S, T>? convert,
+        String? preview,
+      }) async {
+        if (path == '/repos/owner/repo/issues/1') {
+          final issueJson = {
+            'id': 1,
+            'node_id': issueNodeId,
+            'number': issueNumber,
+            'state': 'open',
+            'title': 'Test Issue',
+            'url': 'https://api.github.com/repos/owner/repo/issues/1',
+            'html_url': 'https://github.com/owner/repo/issues/1',
+            'body': 'Test Body',
+          };
+          final issue = convert!(issueJson as S);
+          return issue;
+        }
+        throw Exception('Unexpected path: $path');
+      };
+
+      final exception = OperationException(
+        graphqlErrors: [const GraphQLError(message: 'Failed to delete')],
+      );
+      mockGraphQLService.onMutate = (mutation, variables) {
+        return Future.value(
+          QueryResult(
+            options: QueryOptions(
+              document: gql(''),
+            ), // ignore: deprecated_member_use
+            source: QueryResultSource.network,
+            exception: exception,
+          ),
+        );
+      };
+
+      // Act & Assert
+      expect(
+        () => issuesService.deleteIssue(slug, issueNumber),
+        throwsA(isA<OperationException>()),
+      );
     });
   });
 }
