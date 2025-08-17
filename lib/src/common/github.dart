@@ -6,6 +6,8 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart' as http_parser;
 import 'package:meta/meta.dart';
 
+import 'graphql_service.dart';
+
 ///  The Main GitHub Client
 ///
 ///  ## Example
@@ -63,6 +65,7 @@ class GitHub {
   UrlShortenerService? _urlShortener;
   UsersService? _users;
   ChecksService? _checks;
+  GraphQLService? _graphql;
 
   /// The maximum number of requests that the consumer is permitted to make per
   /// hour.
@@ -142,6 +145,9 @@ class GitHub {
   ///
   /// See https://developer.github.com/v3/checks/
   ChecksService get checks => _checks ??= ChecksService(this);
+
+  /// Service for GraphQL related methods of the GitHub API.
+  GraphQLService get graphql => _graphql ??= GraphQLService(this);
 
   /// Handles Get Requests that respond with JSON
   /// [path] can either be a path like '/repos' or a full url.
