@@ -570,10 +570,12 @@ class IssuesService extends Service {
   /// Deletes an issue.
   ///
   /// This uses the GraphQL API, since issue deletion is not available in the REST API.
-  /// [issueId] is the GraphQL node ID of the issue, not the issue number.
   ///
   /// API docs: https://docs.github.com/en/graphql/reference/mutations#deleteissue
-  Future<void> deleteIssue(String issueId) async {
+  Future<void> deleteIssue(RepositorySlug slug, int issueNumber) async {
+    final issue = await get(slug, issueNumber);
+    final issueId = issue.nodeId;
+
     const mutation = r'''
       mutation DeleteIssue($issueId: ID!) {
         deleteIssue(input: {issueId: $issueId}) {
