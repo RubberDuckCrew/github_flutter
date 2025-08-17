@@ -1,6 +1,8 @@
 import 'dart:convert';
 
-import 'package:github_flutter/src/models/issues.dart';
+import 'package:github_flutter/src/common.dart';
+import 'package:github_flutter/src/common/graphql_service.dart';
+import 'package:graphql/client.dart';
 import 'package:test/test.dart';
 
 const String testIssueCommentJson = '''
@@ -50,6 +52,41 @@ const String testIssueCommentJson = '''
   }
 ''';
 
+// A mock implementation of GitHub that uses noSuchMethod to avoid implementing
+// all methods of the GitHub class.
+class MockGitHub implements GitHub {
+  @override
+  late final GraphQLService graphql;
+
+  MockGitHub(this.graphql);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) {
+    return super.noSuchMethod(invocation);
+  }
+}
+
+// A manual mock for GraphQLService to avoid mockito issues.
+class MockGraphQLService implements GraphQLService {
+  // Callback to be set by the test.
+  late Future<QueryResult> Function(String, Map<String, dynamic>?) onMutate;
+
+  @override
+  Future<QueryResult> mutate(
+    String mutation, {
+    Map<String, dynamic>? variables,
+  }) {
+    return onMutate(mutation, variables);
+  }
+
+  // Unimplemented members
+  @override
+  GitHub get github => throw UnimplementedError();
+  @override
+  Future<QueryResult> query(String query, {Map<String, dynamic>? variables}) =>
+      throw UnimplementedError();
+}
+
 void main() {
   group('Issue Comments', () {
     test('IssueComment from Json', () {
@@ -59,6 +96,67 @@ void main() {
       expect(1352355796, issueComment.id);
       expect('MEMBER', issueComment.authorAssociation);
       expect('CaseyHillers', issueComment.user!.login);
+    });
+  });
+
+  group('IssuesService', () {
+    late IssuesService issuesService;
+    late MockGitHub mockGitHub;
+    late MockGraphQLService mockGraphQLService;
+
+    setUp(() {
+      mockGraphQLService = MockGraphQLService();
+      mockGitHub = MockGitHub(mockGraphQLService);
+      issuesService = IssuesService(mockGitHub);
+    });
+
+    test('deleteIssue success', () async {
+      // Arrange
+      String? capturedMutation;
+      Map<String, dynamic>? capturedVariables;
+
+      mockGraphQLService.onMutate = (mutation, variables) {
+        capturedMutation = mutation;
+        capturedVariables = variables;
+        return Future.value(
+          QueryResult(
+            options: QueryOptions(document: gql('')),
+            source: QueryResultSource.network,
+            data: const {
+              'deleteIssue': {'clientMutationId': '1234'},
+            },
+          ),
+        );
+      };
+
+      // Act
+      await issuesService.deleteIssue('issue-id-123');
+
+      // Assert
+      expect(capturedMutation, contains('mutation DeleteIssue'));
+      expect(capturedVariables, {'issueId': 'issue-id-123'});
+    });
+
+    test('deleteIssue failure', () async {
+      // Arrange
+      final exception = OperationException(
+        graphqlErrors: [const GraphQLError(message: 'Failed to delete')],
+      );
+      mockGraphQLService.onMutate = (mutation, variables) {
+        return Future.value(
+          QueryResult(
+            options: QueryOptions(document: gql('')),
+            source: QueryResultSource.network,
+            exception: exception,
+          ),
+        );
+      };
+
+      // Act & Assert
+      expect(
+        () => issuesService.deleteIssue('issue-id-123'),
+        throwsA(isA<OperationException>()),
+      );
     });
   });
 }
