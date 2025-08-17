@@ -1,7 +1,7 @@
 name: github_flutter
 version: 0.0.1
 description: A lightweight high-level GitHub API Client Library that uses Github's v3 API
-homepage: https://github.com/IamPekka058/github_flutter
+homepage: https://github.com/RubberDuckCrew/github_flutter/
 
 environment:
   sdk: ^3.7.2

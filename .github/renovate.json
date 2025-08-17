@@ -6,6 +6,7 @@
   "major": {
     "automerge": false
   },
+  "reviewers": ["team:github-flutter-development"],
   "labels": [
     "📌 Dependencies"
   ],
