@@ -574,7 +574,7 @@ class IssuesService extends Service {
   ///
   /// API docs: https://docs.github.com/en/graphql/reference/mutations#deleteissue
   Future<void> deleteIssue(String issueId) async {
-    const String mutation = r'''
+    const mutation = r'''
       mutation DeleteIssue($issueId: ID!) {
         deleteIssue(input: {issueId: $issueId}) {
           clientMutationId
