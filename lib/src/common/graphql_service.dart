@@ -13,7 +13,7 @@ class GraphQLService {
     final httpLink = HttpLink('https://api.github.com/graphql');
 
     final authLink = AuthLink(
-      getToken: () async => 'Bearer ${github.auth.token}',
+      getToken: () async => 'Bearer ${github.auth.bearerToken}',
     );
 
     final link = authLink.concat(httpLink);
