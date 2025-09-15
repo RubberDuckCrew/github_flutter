@@ -3,5 +3,6 @@
   "extends": [
     "github>RubberDuckCrew/.github//configs/renovate/renovate-rubberduckcrew.json"
   ],
-  "reviewers": ["team:github-flutter-development"]
+  "reviewers": ["team:github-flutter-development"],
+  "rangeStrategy": "auto"
 }
